@@ -1,0 +1,16 @@
+We have installed the following YAML files in Cluster
+------
+
+
+
+{{- with .Values.course }}
+name: {{ .name | quote }}
+trainer: {{ .trainer | quote }}
+{{- end }}
+
+
+{{- range $k, $v :=  .Values.course }}
+{{ $k }} : {{ $v }}
+{{- end }}
+
+
