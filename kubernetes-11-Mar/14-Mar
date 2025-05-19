@@ -79,7 +79,7 @@ Kubernetes achieves resource management primarily through two key mechanisms def
           containers:
           - name: processor
             image: data-processor:latest
-            resources:
+            resources:  
               requests:
                 cpu: "2"     # Requesting 2 CPU cores
                 memory: "8Gi"  # Requesting 8 Gigabytes of memory
