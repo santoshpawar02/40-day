@@ -1,0 +1,5 @@
+Helm-repo strategy
+helm charts for frontend
+helm charts for other components 
+add if condition to roboshop-helm
+enables schema for catalogs and shipping
