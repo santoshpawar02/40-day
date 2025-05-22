@@ -4,4 +4,4 @@ Taints and tolerations - not dealing with existing pods but only new pod
 Node Affinity
 PoD Affinity
 TOpology Spread constaint
-Pod priority an preemption
+Pod priority an preemption    
