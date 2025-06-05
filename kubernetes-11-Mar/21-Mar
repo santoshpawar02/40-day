@@ -7,3 +7,237 @@ Variables in helm charts
 Named Template
 Acccessing files in Template in helm charts
 Subcharts and global values in helm charts
+
+
+
+# ---------------------------------------------------------------------------- #
+#                        built in objects in helm charts                       #
+# ---------------------------------------------------------------------------- #
+Helm charts utilize several built-in objects that provide powerful templating capabilities, crucial for production-level deployments. These allow for dynamic configuration and context-aware rendering of Kubernetes manifests.
+
+Here are the most important built-in objects with concise, production-level examples:
+
+1.  **`.Release`**: This object provides information about the Helm release itself.
+    * **`.Release.Name`**: The name of the release (e.g., `my-app-v1`).
+        * **Production Example**: Naming Kubernetes resources based on the release name for easy identification.
+        ```yaml
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: {{ .Release.Name }}-backend # Results in e.g., 'my-app-v1-backend'
+        ```
+    * **`.Release.Namespace`**: The namespace the release is deployed into.
+        * **Production Example**: Ensuring a Service is created in the same namespace as the Deployment.
+        ```yaml
+        apiVersion: v1
+        kind: Service
+        metadata:
+          name: {{ .Release.Name }}-svc
+          namespace: {{ .Release.Namespace }} # Ensures service is in the correct namespace
+        ```
+    * **`.Release.Service`**: The service that rendered the template (always `Helm`).
+    * **`.Release.IsUpgrade`**: Boolean, `true` if it's an upgrade, `false` otherwise.
+        * **Production Example**: Running a database migration job *only* on upgrade.
+        ```yaml
+        {{ if .Release.IsUpgrade }}
+        apiVersion: batch/v1
+        kind: Job
+        metadata:
+          name: {{ .Release.Name }}-db-migration
+        # ... job definition ...
+        {{ end }}
+        ```
+    * **`.Release.IsInstall`**: Boolean, `true` if it's an initial install.
+        * **Production Example**: Initializing a database *only* on first install.
+        ```yaml
+        {{ if .Release.IsInstall }}
+        apiVersion: batch/v1
+        kind: Job
+        metadata:
+          name: {{ .Release.Name }}-db-init
+        # ... job definition ...
+        {{ end }}
+        ```
+
+2.  **`.Values`**: This is the most frequently used object, representing the values passed by the user or defined in `values.yaml`.
+    * **Production Example**: Configuring replica counts, image tags, or external URLs dynamically.
+        ```yaml
+        # values.yaml
+        replicaCount: 3
+        image:
+          tag: "1.2.0"
+        env:
+          apiEndpoint: "https://api.example.com"
+        ---
+        # deployment.yaml
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: my-app
+        spec:
+          replicas: {{ .Values.replicaCount }}
+          template:
+            spec:
+              containers:
+              - name: app
+                image: "myrepo/my-app:{{ .Values.image.tag }}"
+                env:
+                - name: API_ENDPOINT
+                  value: {{ .Values.env.apiEndpoint | quote }}
+        ```
+
+3.  **`.Chart`**: Contains information from the `Chart.yaml` file.
+    * **`.Chart.Name`**: The name of the chart (e.g., `my-app`).
+    * **`.Chart.Version`**: The version of the chart (e.g., `0.1.0`).
+        * **Production Example**: Adding chart metadata to resource labels for traceability.
+        ```yaml
+        apiVersion: apps/v1
+        kind: Deployment
+        metadata:
+          name: my-app
+          labels:
+            helm.sh/chart: {{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }} # E.g., my-app-0.1.0
+        ```
+
+4.  **`.Capabilities`**: Provides information about the Kubernetes cluster's capabilities.
+    * **`.Capabilities.KubeVersion.Major`**, **`.Capabilities.KubeVersion.Minor`**: Kubernetes major and minor version.
+        * **Production Example**: Deploying different resource definitions based on Kubernetes version compatibility (e.g., Ingress API version).
+        ```yaml
+        {{- if semverCompare ">=1.19-0" .Capabilities.KubeVersion.GitVersion }}
+        apiVersion: networking.k8s.io/v1 # Use v1 Ingress for K8s 1.19+
+        {{- else }}
+        apiVersion: networking.k8s.io/v1beta1 # Use v1beta1 Ingress for older K8s
+        {{- end }}
+        kind: Ingress
+        # ...
+        ```
+    * **`.Capabilities.APIVersions.Has "storage.k8s.io/v1/StorageClass"`**: Check if a specific API version/resource exists.
+        * **Production Example**: Conditionally deploying a StorageClass if it's supported by the cluster.
+        ```yaml
+        {{- if .Capabilities.APIVersions.Has "storage.k8s.io/v1/StorageClass" }}
+        apiVersion: storage.k8s.io/v1
+        kind: StorageClass
+        # ...
+        {{- end }}
+        ```
+
+These built-in objects, combined with Helm's templating functions, allow for highly flexible, robust, and environment-aware deployments in production.
+
+
+# ---------------------------------------------------------------------------- #
+#                          Values files in helm charts                         #
+# ---------------------------------------------------------------------------- #
+
+**Values files in Helm charts** are YAML files that contain the configuration data for a Helm release. They allow you to customize the behavior and deployment of an application packaged as a Helm chart without modifying the chart's templates directly.
+
+**Key Concepts:**
+
+* **`values.yaml` (Default Values):** Every Helm chart has a `values.yaml` file at its root. This file defines the *default* configuration values for all variables used in the chart's templates.
+* **Overriding Defaults:** When you install or upgrade a Helm chart, you can provide one or more custom values files (e.g., `my-production-values.yaml`) or use `--set` flags to override the default values. Helm merges these values, with later values (or `--set` flags) taking precedence.
+
+**How They Work (Briefly):**
+
+Helm's templating engine (Go templates) uses the values defined in these files to render the final Kubernetes manifests. For example, if your `values.yaml` has `replicaCount: 3`, and your `deployment.yaml` template has `replicas: {{ .Values.replicaCount }}`, Helm will substitute `3` during rendering.
+
+**Production-Level Live Examples:**
+
+1.  **Environment-Specific Deployments:**
+    You have different configurations for development, staging, and production environments.
+
+    * **`my-app/values.yaml` (Default):**
+        ```yaml
+        replicaCount: 1
+        image:
+          tag: "dev"
+        service:
+          type: ClusterIP
+        database:
+          enabled: false
+        ```
+
+    * **`production-values.yaml` (Overrides for Production):**
+        ```yaml
+        replicaCount: 5
+        image:
+          tag: "v1.2.0" # Use a specific, stable version for production
+        service:
+          type: LoadBalancer # Expose publicly
+        database:
+          enabled: true
+          host: "my-prod-db.example.com"
+          port: 5432
+        ```
+
+    * **Installation:**
+        ```bash
+        helm install my-app-prod ./my-app -f production-values.yaml --namespace production
+        ```
+    * **Impact:** This ensures the production environment gets the correct number of replicas, the right image version, public exposure, and connects to the actual production database, all while using the same base chart.
+
+2.  **Resource Allocation Customization:**
+    Different applications or teams may require varying CPU/memory allocations.
+
+    * **`my-chart/values.yaml`:**
+        ```yaml
+        resources:
+          cpu: "100m"
+          memory: "128Mi"
+        ```
+
+    * **Installation with override:**
+        ```bash
+        helm install high-mem-app ./my-chart --set resources.memory="2Gi" --set resources.cpu="1"
+        ```
+    * **Impact:** A specific release gets higher resource limits without modifying the base chart, useful for resource-intensive instances of the same application.
+
+3.  **Feature Flags/Conditional Logic:**
+    Enabling or disabling components or features based on the deployment context.
+
+    * **`my-chart/values.yaml`:**
+        ```yaml
+        ingress:
+          enabled: false
+          host: "chart.example.com"
+        monitoring:
+          enabled: true
+        ```
+
+    * **`my-chart/templates/ingress.yaml` (example snippet):**
+        ```yaml
+        {{ if .Values.ingress.enabled }}
+        apiVersion: networking.k8s.io/v1
+        kind: Ingress
+        metadata:
+          name: {{ include "my-chart.fullname" . }}
+        spec:
+          rules:
+            - host: {{ .Values.ingress.host }}
+              http:
+                paths:
+                  - path: /
+                    pathType: Prefix
+                    backend:
+                      service:
+                        name: {{ include "my-chart.fullname" . }}
+                        port:
+                          number: 80
+        {{ end }}
+        ```
+
+    * **Installation:**
+        ```bash
+        helm install dev-app ./my-chart # Ingress disabled by default
+        helm install public-app ./my-chart --set ingress.enabled=true --set ingress.host="app.public.com"
+        ```
+    * **Impact:** The `ingress.yaml` manifest is only generated if `ingress.enabled` is `true`, allowing dynamic inclusion of Kubernetes resources based on `values`. This is crucial for managing optional features or external access in production.
+
+Values files are fundamental to Helm's power, enabling flexible, reusable, and customizable deployments of complex applications across diverse environments.
+
+
+Template functionns and pipeline in hel charts
+Template functionns list
+Flow control in helm
+Variables in helm charts
+Named Template
+Acccessing files in Template in helm charts
+Subcharts and global values in helm charts
