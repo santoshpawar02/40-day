@@ -1,0 +1,8 @@
+github actions
+selff runner created 
+github runner are temp cant relay on prod level
+add github runner via TF 
+add AWSrunner to github org
+add github runner to ansible roles with all the pre-requisite
+add secrets to vault for github runner
+token needs to add manualy
