@@ -45,7 +45,7 @@ metadata:
   name: catalogue
 data:
   MONGO: "true"
-  MONGO_URL: "mongodb://mongodb-dev.santoshpawar.site:27017/catalogue"
+  MONGO_URL: "mongodb://mongo-dev.santoshpawar.site:27017/catalogue"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -177,7 +177,7 @@ metadata:
   name: user
 data:
   MONGO: "true"
-  MONGO_URL: "mongodb://mongodb-dev.santoshpawar.site:27017/users"
+  MONGO_URL: "mongodb://mongo-dev.santoshpawar.site:27017/users"
   REDIS_URL: "redis://redis-dev.santoshpawar.site:6379"
 ---
 apiVersion: apps/v1
@@ -296,7 +296,7 @@ spec:
           - name: APP_GIT_URL
             value: https://github.com/roboshop-devops-project-v3/catalogue
           - name: DB_HOST
-            value: mongodb-dev.santoshpawar.site
+            value: mongo-dev.santoshpawar.site
           - name: SCHEMA_FILE
             value: db/master-data.js
       restartPolicy: Never
